@@ -1,0 +1,181 @@
+//Limon Lab Roboocyte2 Recording Script v1. For GABA 1 mM and Kainate 100 uM responses. All the code is done in JavaScript. 
+//Laura S. & Brice M. 7/31/24.
+
+//Initial movement of the plate to the Change Plate position, easily accessible to check the plate.
+Robo2.Log("Moving to change Plate position");
+Robo2.Wait(2);
+Robo2.MoveToChangePlatePos();
+
+//Set Variables for the solutions, drug application times, and rinse time
+Robo2.SetDialogVariable("Ringer", 1, "Ringer Valve Open");
+Robo2.SetDialogVariable("GABA", 2, "GABA Valve Open");
+Robo2.SetDialogVariable("Kainate", 3, "Kainate Valve Open");
+Robo2.SetDialogVariable("GABATime", 10, "GABA application time in seconds");
+Robo2.SetDialogVariable("RinseTimeGaba", 60, "Ringer rinse time in seconds after GABA application");
+Robo2.SetDialogVariable("KainateTime", 10, "Kainate application time in seconds");
+Robo2.SetDialogVariable("RinseTime", 20, "Ringers rinse time in seconds");
+
+//Set the resistance, resting membrane potential (RMP) and impalement steps settings
+Set_MIN_RMP(-15);
+Set_MIN_RESISTANCE_I(100);
+Set_MAX_RESISTANCE_I(3000);
+Set_MIN_RESISTANCE_U(100);
+Set_MAX_RESISTANCE_U(3000);
+Set_IMPALEMENT_STEPS_U(20);
+Set_IMPALEMENT_STEPS_I(20);
+Set_IMPALEMENT_STEP(45);
+Set_IMPALEMENT_WAIT(1);
+Set_SAMPLERATE(20);
+
+Robo2.ShowDialog();
+
+//Start of Oocyte Loop, will go through all the oocytes selected in the plate
+
+for (var i = 0; i < Robo2.SelectedWells.Count; i++)
+{
+	var WellIndex = Robo2.SelectedWells[i];
+
+//Initial Movement, will move to liquid position to check the resistance
+	Robo2.Log("Recording oocyte in well: " + Robo2.SelectedWellNames[i]);
+	Robo2.MoveToWell(WellIndex);
+	Robo2.ZMoveToLiquid();
+	
+//Current Clamp, the current will be clamped at 0 nA
+	Robo2.Log("Current clamp at 0 nA");
+	Robo2.Log(TIME_NOW);
+	Robo2.SetHoldingCurrent(0);
+	Robo2.SetCurrentClamp();
+	
+//Start Control Recording
+	Robo2.StartControlRecording();
+
+//Check Resistance of electrodes
+	if (Robo2.ResistanceCheck_I(MIN_RESISTANCE_I, MAX_RESISTANCE_I))
+	{
+	}
+	else
+	{Robo2.StopControlRecording();
+		continue;
+	}
+
+	if (Robo2.ResistanceCheck_U(MIN_RESISTANCE_U, MAX_RESISTANCE_U))
+	{
+	}
+	else
+	{Robo2.StopControlRecording;
+		continue;
+	}
+	
+	Robo2.Log("Electrode resistance I:" + Robo2.RESISTANCE_I);
+	Robo2.Log("Electrode resistance U:" + Robo2.RESISTANCE_U);
+	
+//Offset Compensation
+	Robo2.Log("Electrode Offset");
+	if (!Robo2.DCOffsetCorrection(DCOFFSET_RANGE, DCOFFSET_DELAY, DCOFFSET_WAIT, DCOFFSET_ATTEMPTS))
+	{
+		continue;
+	}
+	
+//Move to Oocyte, the measuring head will move to the oocyte position
+	Robo2.Log("Moving to oocyte");
+	Robo2.Wait(2);
+	Robo2.ZMoveToOocyte();
+
+//Impalement of the oocyte for TEVC
+	if (!Robo2.Impalement(MIN_RMP, IMPALEMENT_STEPS_I, IMPALEMENT_STEPS_U, IMPALEMENT_STEP, IMPALEMENT_WAIT))
+	{
+		Robo2.Log("impalement failed, --> next oocyte");
+		continue;
+	}
+	
+	Robo2.Log("IMPALEMENT_STEPS_I:" + Robo2.IMPALEMENT_STEPS_I);
+	Robo2.Log("IMPALEMENT_STEPS_U:" + Robo2.IMPALEMENT_STEPS_U);
+
+//Voltage Clamp at -80 mV
+	Robo2.Log("Voltage clamp at -80mV");
+	Robo2.SetHoldingVoltage(-80);
+	Robo2.SetVoltageClamp();
+	Robo2.StopControlRecording()
+
+//Start Ringer solution to reach baseline 
+	Robo2.StartRecording();
+	Robo2.Log("Start Ringer")
+	Robo2.WastePumpOn(5000);
+	Robo2.OpenValve(Ringer);
+	Robo2.ValvePumpOn(5000);
+	Robo2.Wait(30);
+	Robo2.CloseAllValves();
+
+//Start GABA application
+	Robo2.Log("Start GABA 1mM")
+	Robo2.WastePumpOn(5000);
+	Robo2.TransmitRecording(REC_TAG_REF_COMPOUND);
+	Robo2.TransmitCompoundValve(GABA);
+	Robo2.OpenValve(GABA);
+	Robo2.ValvePumpOn(5000);
+	Robo2.Wait(GABATime);
+	Robo2.CloseAllValves();
+	
+//Start Ringer rinse after GABA application
+	Robo2.Log("Start Ringer Rinse")
+	Robo2.WastePumpOn(5000);
+	Robo2.OpenValve(Ringer);
+	Robo2.TransmitRecording(REC_TAG_REF_COMPOUND);
+	Robo2.TransmitCompoundValve(Ringer);
+	Robo2.ValvePumpOn(5000);
+	Robo2.Wait(RinseTimeGaba);
+	Robo2.CloseAllValves();
+	
+	
+//Start Kainate application
+	Robo2.Log("Start Kainate 100 uM")
+	Robo2.WastePumpOn(5000);
+	Robo2.TransmitRecording(REC_TAG_REF_COMPOUND);
+	Robo2.TransmitCompoundValve(Kainate);
+	Robo2.OpenValve(Kainate);
+	Robo2.ValvePumpOn(5000);
+	Robo2.Wait(KainateTime);
+	Robo2.CloseAllValves()
+	
+//Start Ringer rinse after Kainate application
+	Robo2.Log("Start kainate Ringer Rinse")
+	Robo2.WastePumpOn(5000);
+	Robo2.OpenValve(Ringer);
+	Robo2.ValvePumpOn(5000);
+	Robo2.Wait(RinseTime);
+	Robo2.CloseAllValves();
+
+//End of Oocyte Recording
+	Robo2.StopRecording();
+	Robo2.WastePumpOff();
+	Robo2.ValvePumpOff();
+	Robo2.Wait(2);
+	Robo2.ZMoveHome();
+	
+//Washing Electrodes with ringer solution
+	Robo2.Log("Electrode Wash");
+	Robo2.Wait(2);
+	Robo2.MoveToParkPos();
+	Robo2.WastePumpOn(5000);
+	Robo2.OpenValve(Ringer);
+	Robo2.ValvePumpOn(5000);
+	Robo2.Wait(15);
+	Robo2.CloseAllValves();
+
+	Robo2.WastePumpOn(5000);
+	Robo2.OpenValve(Ringer);
+	Robo2.ValvePumpOn(5000);
+	Robo2.Wait(5);
+	Robo2.CloseAllValves();
+	Robo2.WastePumpOff();
+	Robo2.ValvePumpOff();
+
+	Robo2.Log("                                          ");
+	Robo2.Log("                                          ");
+
+}
+
+Robo2.Log("Well Plate Completed");
+Robo2.Wait(1);
+Robo2.MoveToHomePos();
+
